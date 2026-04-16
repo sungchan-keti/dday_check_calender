@@ -2,6 +2,7 @@ const STORAGE_KEY = 'dday-visual-tracker-v1';
 const DAY_MS = 1000 * 60 * 60 * 24;
 
 const elements = {
+  goalTabs: document.querySelector('#goalTabs'),
   goalTitle: document.querySelector('#goalTitle'),
   startDate: document.querySelector('#startDate'),
   targetDate: document.querySelector('#targetDate'),
@@ -36,6 +37,56 @@ function init() {
   render();
 }
 
+function getActiveGoal() {
+  return state.goals.find((g) => g.id === state.activeGoalId) || state.goals[0];
+}
+
+function generateId() {
+  return 'goal-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+}
+
+function addGoal() {
+  const today = startOfToday();
+  const defaultTarget = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 60);
+  const newGoal = {
+    id: generateId(),
+    goalTitle: '새 목표',
+    startDate: formatDate(today),
+    targetDate: formatDate(defaultTarget),
+    checkedDates: {},
+  };
+  state.goals.push(newGoal);
+  state.activeGoalId = newGoal.id;
+  saveState();
+  syncFormWithState();
+  render();
+}
+
+function removeGoal(goalId) {
+  if (state.goals.length <= 1) {
+    setMessage('최소 1개의 목표는 유지해야 합니다.', 'error');
+    return;
+  }
+  const ok = window.confirm('이 목표를 삭제할까요? 체크 기록도 함께 삭제됩니다.');
+  if (!ok) return;
+
+  state.goals = state.goals.filter((g) => g.id !== goalId);
+  if (state.activeGoalId === goalId) {
+    state.activeGoalId = state.goals[0].id;
+  }
+  saveState();
+  syncFormWithState();
+  render();
+}
+
+function switchGoal(goalId) {
+  if (state.activeGoalId === goalId) return;
+  state.activeGoalId = goalId;
+  saveState();
+  syncFormWithState();
+  render();
+}
+
 function bindEvents() {
   elements.saveSettingsBtn.addEventListener('click', handleSaveSettings);
   elements.goTodayBtn.addEventListener('click', jumpToCurrentMonth);
@@ -57,6 +108,31 @@ function bindEvents() {
       if (eventName === 'keydown' && event.key !== 'Enter') return;
       handleSaveSettings();
     });
+  });
+
+  [elements.goalTitle, elements.startDate, elements.targetDate].forEach((el) => {
+    el.addEventListener('input', saveFormValues);
+  });
+
+  window.addEventListener('beforeunload', saveFormValues);
+
+  elements.goalTabs.addEventListener('click', (event) => {
+    const addBtn = event.target.closest('[data-action="add-goal"]');
+    if (addBtn) {
+      addGoal();
+      return;
+    }
+
+    const removeBtn = event.target.closest('[data-action="remove-goal"]');
+    if (removeBtn) {
+      removeGoal(removeBtn.dataset.goalId);
+      return;
+    }
+
+    const tab = event.target.closest('.goal-tab[data-goal-id]');
+    if (tab) {
+      switchGoal(tab.dataset.goalId);
+    }
   });
 
   elements.calendarGrid.addEventListener('click', (event) => {
@@ -81,6 +157,7 @@ function bindEvents() {
 }
 
 function handleSaveSettings() {
+  const goal = getActiveGoal();
   const draft = {
     goalTitle: (elements.goalTitle.value || '').trim() || '나의 목표',
     startDate: elements.startDate.value,
@@ -97,9 +174,9 @@ function handleSaveSettings() {
     return;
   }
 
-  state.goalTitle = draft.goalTitle;
-  state.startDate = draft.startDate;
-  state.targetDate = draft.targetDate;
+  goal.goalTitle = draft.goalTitle;
+  goal.startDate = draft.startDate;
+  goal.targetDate = draft.targetDate;
 
   const today = startOfToday();
   const currentMonthDate = parseDateKey(`${state.viewYear}-${String(state.viewMonth + 1).padStart(2, '0')}-01`);
@@ -135,10 +212,11 @@ function moveMonth(offset) {
 }
 
 function resetChecks() {
-  const ok = window.confirm('지금까지 기록한 X 표시를 모두 초기화할까요?');
+  const goal = getActiveGoal();
+  const ok = window.confirm(`"${goal.goalTitle}"의 X 표시를 모두 초기화할까요?`);
   if (!ok) return;
 
-  state.checkedDates = {};
+  goal.checkedDates = {};
   saveState();
   setMessage('X 기록을 초기화했습니다.', 'success');
   render();
@@ -152,6 +230,7 @@ function selectDate(dateKey) {
 }
 
 function toggleChecked(dateKey) {
+  const goal = getActiveGoal();
   const config = getConfig();
   if (!config.isValid) {
     setMessage('먼저 시작일과 D-day를 올바르게 설정해 주세요.', 'error');
@@ -166,11 +245,11 @@ function toggleChecked(dateKey) {
 
   state.selectedDate = dateKey;
 
-  if (state.checkedDates[dateKey]) {
-    delete state.checkedDates[dateKey];
+  if (goal.checkedDates[dateKey]) {
+    delete goal.checkedDates[dateKey];
     setMessage(`${formatDisplayDate(date)}의 X 표시를 취소했습니다.`, 'success');
   } else {
-    state.checkedDates[dateKey] = true;
+    goal.checkedDates[dateKey] = true;
     setMessage(`${formatDisplayDate(date)}에 X 표시를 남겼습니다.`, 'success');
   }
 
@@ -179,12 +258,34 @@ function toggleChecked(dateKey) {
 }
 
 function render() {
+  renderGoalTabs();
   renderSummary();
   renderCalendar();
   renderSelectedDay();
 }
 
+function renderGoalTabs() {
+  const tabs = state.goals.map((goal) => {
+    const isActive = goal.id === state.activeGoalId;
+    const removeBtn = state.goals.length > 1
+      ? `<button class="goal-tab__remove" type="button" data-action="remove-goal" data-goal-id="${goal.id}" aria-label="목표 삭제">&times;</button>`
+      : '';
+    return `
+      <div class="goal-tab ${isActive ? 'goal-tab--active' : ''}" data-goal-id="${goal.id}">
+        <span class="goal-tab__name">${escapeHtml(goal.goalTitle)}</span>
+        ${removeBtn}
+      </div>
+    `;
+  }).join('');
+
+  elements.goalTabs.innerHTML = `
+    ${tabs}
+    <button class="goal-tab goal-tab--add" type="button" data-action="add-goal">+ 새 목표</button>
+  `;
+}
+
 function renderSummary() {
+  const goal = getActiveGoal();
   const config = getConfig();
   const today = startOfToday();
 
@@ -212,7 +313,7 @@ function renderSummary() {
   const progressPercent = elapsedDays > 0 ? Math.round((checkedElapsed / elapsedDays) * 100) : 0;
 
   elements.todayDday.textContent = formatDday(config.targetDate, today);
-  elements.todaySummaryText.textContent = `${state.goalTitle} · ${formatDisplayDate(config.targetDate)} 기준`;
+  elements.todaySummaryText.textContent = `${goal.goalTitle} · ${formatDisplayDate(config.targetDate)} 기준`;
 
   if (diffToTarget > 0) {
     elements.remainingDays.textContent = `${diffToTarget}일`;
@@ -235,6 +336,7 @@ function renderSummary() {
 }
 
 function renderCalendar() {
+  const goal = getActiveGoal();
   const monthDate = new Date(state.viewYear, state.viewMonth, 1);
   elements.calendarTitle.textContent = `${monthDate.getFullYear()}년 ${monthDate.getMonth() + 1}월`;
 
@@ -259,7 +361,7 @@ function renderCalendar() {
     const isToday = isSameDate(currentDate, today);
     const isTarget = config.isValid && isSameDate(currentDate, config.targetDate);
     const isSelected = state.selectedDate === dateKey;
-    const isChecked = Boolean(state.checkedDates[dateKey]);
+    const isChecked = Boolean(goal.checkedDates[dateKey]);
     const inRange = config.isValid && isWithinRange(currentDate, config.startDate, config.targetDate);
     const isFuture = compareDates(currentDate, today) > 0;
 
@@ -313,10 +415,11 @@ function renderCalendar() {
 }
 
 function renderSelectedDay() {
+  const goal = getActiveGoal();
   const config = getConfig();
   const selectedDate = parseDateKey(state.selectedDate) || startOfToday();
   const dateKey = formatDate(selectedDate);
-  const isChecked = Boolean(state.checkedDates[dateKey]);
+  const isChecked = Boolean(goal.checkedDates[dateKey]);
   const inRange = config.isValid && isWithinRange(selectedDate, config.startDate, config.targetDate);
   const today = startOfToday();
   const offsetFromToday = differenceInDays(selectedDate, today);
@@ -348,7 +451,7 @@ function renderSelectedDay() {
     <p class="selected-day-card__desc">
       ${relativeText}<br />
       ${config.isValid
-        ? `${state.goalTitle} 기준 ${inRange ? '목표 기간 안의 날짜입니다.' : '목표 기간 밖의 날짜입니다.'}`
+        ? `${goal.goalTitle} 기준 ${inRange ? '목표 기간 안의 날짜입니다.' : '목표 기간 밖의 날짜입니다.'}`
         : '먼저 시작일과 D-day를 설정해 주세요.'}
     </p>
 
@@ -363,7 +466,7 @@ function renderSelectedDay() {
       </div>
       <div class="stat-box">
         <span>목표명</span>
-        <strong>${escapeHtml(state.goalTitle)}</strong>
+        <strong>${escapeHtml(goal.goalTitle)}</strong>
       </div>
     </div>
 
@@ -382,7 +485,7 @@ function getMonthStats(year, month, config) {
     return { availableDays: 0, checkedDays: 0, progressRate: 0 };
   }
 
-  const first = new Date(year, month, 1);
+  const goal = getActiveGoal();
   const last = new Date(year, month + 1, 0);
   let availableDays = 0;
   let checkedDays = 0;
@@ -391,7 +494,7 @@ function getMonthStats(year, month, config) {
     const current = new Date(year, month, day);
     if (isWithinRange(current, config.startDate, config.targetDate)) {
       availableDays += 1;
-      if (state.checkedDates[formatDate(current)]) {
+      if (goal.checkedDates[formatDate(current)]) {
         checkedDays += 1;
       }
     }
@@ -409,23 +512,26 @@ function countCheckedDatesBetween(startDate, endDate) {
     return 0;
   }
 
-  return Object.keys(state.checkedDates).filter((dateKey) => {
+  const goal = getActiveGoal();
+  return Object.keys(goal.checkedDates).filter((dateKey) => {
     const current = parseDateKey(dateKey);
     return current && isWithinRange(current, startDate, endDate);
   }).length;
 }
 
 function getConfig() {
-  const startDate = parseDateKey(state.startDate);
-  const targetDate = parseDateKey(state.targetDate);
+  const goal = getActiveGoal();
+  const startDate = parseDateKey(goal.startDate);
+  const targetDate = parseDateKey(goal.targetDate);
   const isValid = Boolean(startDate && targetDate && compareDates(startDate, targetDate) <= 0);
   return { startDate, targetDate, isValid };
 }
 
 function syncFormWithState() {
-  elements.goalTitle.value = state.goalTitle;
-  elements.startDate.value = state.startDate;
-  elements.targetDate.value = state.targetDate;
+  const goal = getActiveGoal();
+  elements.goalTitle.value = goal.goalTitle;
+  elements.startDate.value = goal.startDate;
+  elements.targetDate.value = goal.targetDate;
 }
 
 function setMessage(message, type = 'success') {
@@ -436,11 +542,16 @@ function setMessage(message, type = 'success') {
 function loadState() {
   const today = startOfToday();
   const defaultTarget = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 60);
-  const defaults = {
+  const defaultGoal = {
+    id: generateId(),
     goalTitle: '나의 목표',
     startDate: formatDate(today),
     targetDate: formatDate(defaultTarget),
     checkedDates: {},
+  };
+  const defaults = {
+    goals: [defaultGoal],
+    activeGoalId: defaultGoal.id,
     viewYear: today.getFullYear(),
     viewMonth: today.getMonth(),
     selectedDate: formatDate(today),
@@ -453,10 +564,18 @@ function loadState() {
     }
 
     const saved = JSON.parse(raw);
+
+    if (!saved.goals) {
+      return migrateFromSingleGoal(saved, defaults);
+    }
+
     return {
       ...defaults,
       ...saved,
-      checkedDates: saved.checkedDates && typeof saved.checkedDates === 'object' ? saved.checkedDates : {},
+      goals: saved.goals.map((g) => ({
+        ...g,
+        checkedDates: g.checkedDates && typeof g.checkedDates === 'object' ? g.checkedDates : {},
+      })),
     };
   } catch (error) {
     console.error('저장된 데이터를 불러오지 못했습니다.', error);
@@ -464,8 +583,34 @@ function loadState() {
   }
 }
 
+function migrateFromSingleGoal(saved, defaults) {
+  const migratedGoal = {
+    id: generateId(),
+    goalTitle: saved.goalTitle || '나의 목표',
+    startDate: saved.startDate || defaults.goals[0].startDate,
+    targetDate: saved.targetDate || defaults.goals[0].targetDate,
+    checkedDates: saved.checkedDates && typeof saved.checkedDates === 'object' ? saved.checkedDates : {},
+  };
+
+  return {
+    goals: [migratedGoal],
+    activeGoalId: migratedGoal.id,
+    viewYear: saved.viewYear || defaults.viewYear,
+    viewMonth: saved.viewMonth !== undefined ? saved.viewMonth : defaults.viewMonth,
+    selectedDate: saved.selectedDate || defaults.selectedDate,
+  };
+}
+
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function saveFormValues() {
+  const goal = getActiveGoal();
+  goal.goalTitle = (elements.goalTitle.value || '').trim() || '나의 목표';
+  goal.startDate = elements.startDate.value;
+  goal.targetDate = elements.targetDate.value;
+  saveState();
 }
 
 function parseDateKey(value) {
