@@ -1,37 +1,36 @@
 # D-day Calendar Tracker
 
-캘린더 기반으로 D-day를 설정하고, 날짜별 진행 여부를 `X`로 표시할 수 있는 정적 웹 앱입니다.
+A static web app for tracking D-day goals with a visual calendar. Set start and target dates, mark each day with an `X`, and monitor your progress at a glance.
 
-## 기능
+## Features
 
-- **다중 목표 관리** — 탭 방식으로 여러 목표를 추가/전환/삭제
-- 목표 이름, 시작일, D-day 설정
-- 날짜별 `D-숫자 / D+숫자 / D-DAY` 표시
-- 매일 달력에서 `X 표시` 토글
-- 오늘, D-day, 체크 완료 상태 시각화
-- 진행률 / 남은 기간 / 누적 체크 현황 요약
-- `localStorage` 기반 자동 저장 (입력 즉시 저장)
+- **Multiple Goals** — Add, switch, and delete goals using a tab-based UI
+- Set goal name, start date, and D-day target date
+- Per-date `D-N / D+N / D-DAY` countdown display
+- Toggle daily `X` marks on the calendar
+- Visual indicators for today, D-day, and checked dates
+- Summary cards for progress rate, remaining days, and cumulative checks
+- Auto-save to `localStorage` (saves on every input change)
 
-## 실행 방법
+## Getting Started
 
-### 1) 바로 열기
-`index.html`을 브라우저에서 바로 열어도 동작합니다.
+### Option 1: Open directly
+Open `index.html` in any modern browser.
 
-### 2) 로컬 서버로 실행
-정적 파일 서버로 실행하면 더 편하게 테스트할 수 있습니다.
+### Option 2: Local server
 
 ```bash
 python -m http.server 4173
 ```
 
-브라우저에서 아래 주소를 열면 됩니다.
+Then visit:
 
 ```text
 http://localhost:4173
 ```
 
-## 파일 구조
+## File Structure
 
-- `index.html` : 앱 구조 (목표 탭 바, 설정 패널, 캘린더, 요약 카드)
-- `style.css` : 다크 테마 UI 스타일
-- `app.js` : 다중 목표 관리, D-day 계산, 캘린더 렌더링, 체크 저장 로직
+- `index.html` — App layout (goal tabs, settings panel, calendar, summary cards)
+- `style.css` — Dark theme UI styles with glassmorphism effects
+- `app.js` — Multi-goal management, D-day calculation, calendar rendering, check persistence
