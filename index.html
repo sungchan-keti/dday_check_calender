@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>D-day Calendar Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23081122'/%3E%3Cpath d='M18 18h28v28H18z' fill='none' stroke='%2376a9ff' stroke-width='4'/%3E%3Cpath d='M22 28l8 8m0-8l-8 8m14-18h6m-6 8h6m-20-14v8m12-8v8' stroke='%23ff6b87' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero panel">
+      <div>
+        <p class="eyebrow">D-DAY VISUAL TRACKER</p>
+        <h1>캘린더로 보는 D-day 진행 관리</h1>
+        <p class="hero__description">
+          시작일과 목표일을 정하고, 하루가 끝날 때마다 <strong>X 표시</strong>를 남기면서
+          날짜별 D-day를 한눈에 확인하세요.
+        </p>
+      </div>
+      <div class="hero__badge">자동 저장</div>
+    </section>
+
+    <section class="panel settings-panel">
+      <div class="panel__header">
+        <div>
+          <p class="panel__eyebrow">SETUP</p>
+          <h2>목표 설정</h2>
+        </div>
+        <p class="panel__caption">설정은 브라우저에 저장되며, 새로고침 후에도 유지됩니다.</p>
+      </div>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>목표 이름</span>
+          <input id="goalTitle" type="text" maxlength="40" placeholder="예: 자격증 시험일까지" />
+        </label>
+
+        <label class="field">
+          <span>시작일</span>
+          <input id="startDate" type="date" />
+        </label>
+
+        <label class="field">
+          <span>D-day</span>
+          <input id="targetDate" type="date" />
+        </label>
+      </div>
+
+      <div class="settings-actions">
+        <button id="saveSettingsBtn" class="btn btn--primary" type="button">설정 저장</button>
+        <button id="goTodayBtn" class="btn btn--ghost" type="button">오늘 달로 이동</button>
+        <button id="resetChecksBtn" class="btn btn--danger" type="button">X 기록 초기화</button>
+      </div>
+
+      <p id="validationMessage" class="message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="summary-grid" aria-label="요약 정보">
+      <article class="summary-card panel">
+        <p>오늘 기준</p>
+        <strong id="todayDday">-</strong>
+        <span id="todaySummaryText">목표일을 설정해 주세요.</span>
+      </article>
+
+      <article class="summary-card panel">
+        <p>남은 기간</p>
+        <strong id="remainingDays">-</strong>
+        <span id="remainingSummaryText">계산 대기 중</span>
+      </article>
+
+      <article class="summary-card panel">
+        <p>현재 진행률</p>
+        <strong id="progressRate">-</strong>
+        <span id="progressSummaryText">체크 데이터를 기반으로 계산됩니다.</span>
+      </article>
+
+      <article class="summary-card panel">
+        <p>누적 X 체크</p>
+        <strong id="checkedCount">-</strong>
+        <span id="checkedSummaryText">총 기간 대비 체크 현황</span>
+      </article>
+    </section>
+
+    <section class="panel calendar-panel">
+      <div class="calendar-toolbar">
+        <div>
+          <p class="panel__eyebrow">CALENDAR</p>
+          <h2 id="calendarTitle">-</h2>
+          <p id="monthSummary" class="panel__caption">월별 진행률을 확인하세요.</p>
+        </div>
+
+        <div class="calendar-toolbar__actions">
+          <button id="prevMonthBtn" class="btn btn--icon" type="button" aria-label="이전 달">←</button>
+          <button id="currentMonthBtn" class="btn btn--ghost" type="button">이번 달</button>
+          <button id="nextMonthBtn" class="btn btn--icon" type="button" aria-label="다음 달">→</button>
+        </div>
+      </div>
+
+      <div class="legend" aria-label="범례">
+        <span><i class="legend-dot legend-dot--today"></i>오늘</span>
+        <span><i class="legend-dot legend-dot--target"></i>D-day</span>
+        <span><i class="legend-dot legend-dot--checked"></i>X 완료</span>
+      </div>
+
+      <div class="weekday-row" aria-hidden="true">
+        <span>일</span>
+        <span>월</span>
+        <span>화</span>
+        <span>수</span>
+        <span>목</span>
+        <span>금</span>
+        <span>토</span>
+      </div>
+
+      <div id="calendarGrid" class="calendar-grid" role="grid" aria-label="D-day 캘린더"></div>
+    </section>
+
+    <section class="detail-grid">
+      <article class="panel detail-card">
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">SELECTED DAY</p>
+            <h2>선택한 날짜</h2>
+          </div>
+          <p class="panel__caption">날짜를 눌러 상세 정보를 보고 X를 토글할 수 있습니다.</p>
+        </div>
+        <div id="selectedDayCard" class="selected-day-card"></div>
+      </article>
+
+      <article class="panel tip-card">
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">HOW TO USE</p>
+            <h2>사용 방법</h2>
+          </div>
+        </div>
+
+        <ol class="tips">
+          <li>목표 이름, 시작일, D-day를 설정합니다.</li>
+          <li>매일 완료한 날짜에 <strong>X 표시</strong> 버튼을 눌러 기록합니다.</li>
+          <li>각 날짜 카드의 <strong>D-숫자 / D+숫자</strong>로 남은 기간을 직관적으로 확인합니다.</li>
+          <li>선택한 날짜 영역에서 상태를 다시 확인하거나 취소할 수 있습니다.</li>
+        </ol>
+      </article>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
